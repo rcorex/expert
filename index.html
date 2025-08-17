@@ -7,7 +7,7 @@
     <style>
         body { font-family: sans-serif; margin: 2em; max-width: 800px; margin: auto; }
         .box { display: flex; flex-direction: column; width: 100%; margin-top: 1em; }
-        textarea { width: 100%; height: 300px; margin-top: 0.5em; box-sizing: border-box; }
+        textarea { width: 100%; height: 300px; margin-top: 0.5em; box-sizing: border-box; font-family: monospace; }
         button { margin-top: 1em; padding: 0.5em 1em; font-size: 1em; }
         #controls { margin-top: 1em; }
     </style>
@@ -24,7 +24,7 @@
 
     <div class="box">
         <h2>Input File (Editable)</h2>
-        <textarea id="inputFileContent" placeholder="Paste file content here..."></textarea>
+        <textarea id="inputFileContent" placeholder="Paste file content here or upload a file..."></textarea>
     </div>
 
     <button id="recalculateButton">Recalculate Checksum</button>
@@ -51,8 +51,7 @@
             const reader = new FileReader();
 
             reader.onload = function(e) {
-                const contents = e.target.result;
-                document.getElementById('inputFileContent').value = contents;
+                document.getElementById('inputFileContent').value = e.target.result;
             };
 
             reader.readAsText(file);
@@ -65,25 +64,36 @@
                 return;
             }
 
-            const lines = contents.split('\r\n');
-            const firstLine = lines[0];
-
-            if (firstLine.length >= 7 && firstLine.toUpperCase().startsWith('CRC')) {
-                // The data to be hashed starts after the 'CRCxxxx' prefix
-                const dataToHash = contents.substring(7);
-
-                const crc = crc16_ccitt_false(dataToHash);
-                const crcHex = crc.toString(16).toUpperCase().padStart(4, '0');
-                const newFirstLine = 'CRC' + crcHex;
-
-                lines[0] = newFirstLine;
-                outputContent = lines.join('\r\n');
-
-                document.getElementById('outputFileContent').value = outputContent;
-                document.getElementById('downloadButton').style.display = 'block';
-            } else {
-                alert('The first line of the input text must start with "CRCxxxx" (e.g., CRC0000).');
+            // Check that the file starts with the CRC prefix
+            if (contents.length < 7 || !contents.toUpperCase().startsWith('CRC')) {
+                alert('The input text must start with "CRCxxxx" (e.g., CRC0000).');
+                return;
             }
+
+            // The data to be hashed is everything AFTER the first 7 bytes ('CRCxxxx')
+            const dataToHash = contents.substring(7);
+
+            // Calculate the new CRC
+            const crc = crc16_ccitt_false(dataToHash);
+            const crcHex = crc.toString(16).toUpperCase().padStart(4, '0');
+            const newCrcLine = 'CRC' + crcHex;
+
+            // Find the end of the first line to get the rest of the file content
+            let restOfContent = '';
+            const firstNewLineIndex = contents.indexOf('\n');
+
+            if (firstNewLineIndex !== -1) {
+                // If a newline character is found, the rest of the content starts from there
+                restOfContent = contents.substring(firstNewLineIndex);
+            }
+            // If no newline is found, it's a single-line file, and restOfContent remains blank.
+
+            // Reconstruct the final output
+            outputContent = newCrcLine + restOfContent;
+
+            // Update the UI
+            document.getElementById('outputFileContent').value = outputContent;
+            document.getElementById('downloadButton').style.display = 'block';
         }
 
         function downloadOutputFile() {
