@@ -15,7 +15,7 @@
 <body>
 
     <h1>CRC-16-CCITT-FALSE Recalculator</h1>
-    <p>Upload a text file or paste your content into the input box below. Edit the text as needed, then click "Recalculate Checksum".</p>
+    <p>Upload a text file or paste your content into the input box below. The tool will ensure line endings are consistent (CRLF) for accurate checksum calculation.</p>
 
     <div id="controls">
         <label for="fileInput">Upload File:</label>
@@ -58,13 +58,16 @@
         }
 
         function runCalculation() {
-            const contents = document.getElementById('inputFileContent').value;
-            if (!contents) {
+            const contentsFromTextarea = document.getElementById('inputFileContent').value;
+            if (!contentsFromTextarea) {
                 alert("Input box is empty.");
                 return;
             }
 
-            // Check that the file starts with the CRC prefix
+            // **FIX:** Normalize all line endings to CRLF (\r\n) to ensure consistency.
+            // This replaces any standalone \n or \r\n with \r\n.
+            const contents = contentsFromTextarea.replace(/\r?\n/g, '\r\n');
+
             if (contents.length < 7 || !contents.toUpperCase().startsWith('CRC')) {
                 alert('The input text must start with "CRCxxxx" (e.g., CRC0000).');
                 return;
@@ -73,22 +76,21 @@
             // The data to be hashed is everything AFTER the first 7 bytes ('CRCxxxx')
             const dataToHash = contents.substring(7);
 
-            // Calculate the new CRC
+            // Calculate the new CRC on the CRLF-normalized data
             const crc = crc16_ccitt_false(dataToHash);
             const crcHex = crc.toString(16).toUpperCase().padStart(4, '0');
             const newCrcLine = 'CRC' + crcHex;
 
             // Find the end of the first line to get the rest of the file content
+            const firstLineEndIndex = contents.indexOf('\r\n');
             let restOfContent = '';
-            const firstNewLineIndex = contents.indexOf('\n');
 
-            if (firstNewLineIndex !== -1) {
-                // If a newline character is found, the rest of the content starts from there
-                restOfContent = contents.substring(firstNewLineIndex);
+            if (firstLineEndIndex !== -1) {
+                // If a CRLF is found, the rest of the content starts from there
+                restOfContent = contents.substring(firstLineEndIndex);
             }
-            // If no newline is found, it's a single-line file, and restOfContent remains blank.
-
-            // Reconstruct the final output
+            
+            // Reconstruct the final output with the new CRC
             outputContent = newCrcLine + restOfContent;
 
             // Update the UI
@@ -97,6 +99,7 @@
         }
 
         function downloadOutputFile() {
+            // The outputContent string already has the correct CRLF line endings
             const blob = new Blob([outputContent], { type: 'text/plain' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
