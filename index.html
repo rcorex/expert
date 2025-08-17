@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRC-16-CCITT-FALSE Recalculator</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .container { display: flex; gap: 2em; }
+        .box { display: flex; flex-direction: column; width: 50%; }
+        textarea { width: 100%; height: 300px; margin-top: 0.5em; }
+        button { margin-top: 1em; }
+    </style>
+</head>
+<body>
+
+    <h1>CRC-16-CCITT-FALSE Recalculator</h1>
+    <p>Upload a text file to recalculate the CRC checksum on the first line.</p>
+
+    <input type="file" id="fileInput">
+
+    <div class="container">
+        <div class="box">
+            <h2>Input File</h2>
+            <textarea id="inputFileContent" readonly></textarea>
+        </div>
+        <div class="box">
+            <h2>Output File</h2>
+            <textarea id="outputFileContent" readonly></textarea>
+            <button id="downloadButton" style="display: none;">Download Output File</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
+        document.getElementById('downloadButton').addEventListener('click', downloadOutputFile, false);
+
+        let outputContent = '';
+        let originalFilename = '';
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            originalFilename = file.name;
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const contents = e.target.result;
+                document.getElementById('inputFileContent').value = contents;
+                calculateAndDisplayOutput(contents);
+            };
+
+            reader.readAsText(file);
+        }
+
+        function calculateAndDisplayOutput(contents) {
+            const lines = contents.split('\r\n');
+            const firstLine = lines[0];
+
+            if (firstLine.length >= 7 && firstLine.toUpperCase().startsWith('CRC')) {
+                const dataToHash = contents.substring(7);
+
+                const crc = crc16_ccitt_false(dataToHash);
+                const crcHex = crc.toString(16).toUpperCase().padStart(4, '0');
+                const newFirstLine = 'CRC' + crcHex;
+
+                lines[0] = newFirstLine;
+                outputContent = lines.join('\r\n');
+
+                document.getElementById('outputFileContent').value = outputContent;
+                document.getElementById('downloadButton').style.display = 'block';
+            } else {
+                alert('The first line of the file must start with "CRCxxxx".');
+            }
+        }
+
+        function downloadOutputFile() {
+            const blob = new Blob([outputContent], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'processed_' + originalFilename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function crc16_ccitt_false(str) {
+            let crc = 0xFFFF;
+            const polynomial = 0x1021;
+
+            for (let i = 0; i < str.length; i++) {
+                crc ^= str.charCodeAt(i) << 8;
+                for (let j = 0; j < 8; j++) {
+                    if ((crc & 0x8000) !== 0) {
+                        crc = (crc << 1) ^ polynomial;
+                    } else {
+                        crc <<= 1;
+                    }
+                }
+            }
+
+            return crc & 0xFFFF;
+        }
+    </script>
+
+</body>
+</html>
