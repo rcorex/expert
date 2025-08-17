@@ -5,58 +5,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRC-16-CCITT-FALSE Recalculator</title>
     <style>
-        body { font-family: sans-serif; margin: 2em; }
-        .container { display: flex; gap: 2em; }
-        .box { display: flex; flex-direction: column; width: 50%; }
-        textarea { width: 100%; height: 300px; margin-top: 0.5em; }
-        button { margin-top: 1em; }
+        body { font-family: sans-serif; margin: 2em; max-width: 800px; margin: auto; }
+        .box { display: flex; flex-direction: column; width: 100%; margin-top: 1em; }
+        textarea { width: 100%; height: 300px; margin-top: 0.5em; box-sizing: border-box; }
+        button { margin-top: 1em; padding: 0.5em 1em; font-size: 1em; }
+        #controls { margin-top: 1em; }
     </style>
 </head>
 <body>
 
     <h1>CRC-16-CCITT-FALSE Recalculator</h1>
-    <p>Upload a text file to recalculate the CRC checksum on the first line.</p>
+    <p>Upload a text file or paste your content into the input box below. Edit the text as needed, then click "Recalculate Checksum".</p>
 
-    <input type="file" id="fileInput">
+    <div id="controls">
+        <label for="fileInput">Upload File:</label>
+        <input type="file" id="fileInput">
+    </div>
 
-    <div class="container">
-        <div class="box">
-            <h2>Input File</h2>
-            <textarea id="inputFileContent" readonly></textarea>
-        </div>
-        <div class="box">
-            <h2>Output File</h2>
-            <textarea id="outputFileContent" readonly></textarea>
-            <button id="downloadButton" style="display: none;">Download Output File</button>
-        </div>
+    <div class="box">
+        <h2>Input File (Editable)</h2>
+        <textarea id="inputFileContent" placeholder="Paste file content here..."></textarea>
+    </div>
+
+    <button id="recalculateButton">Recalculate Checksum</button>
+
+    <div class="box">
+        <h2>Output File</h2>
+        <textarea id="outputFileContent" readonly></textarea>
+        <button id="downloadButton" style="display: none;">Download Output File</button>
     </div>
 
     <script>
         document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
+        document.getElementById('recalculateButton').addEventListener('click', runCalculation, false);
         document.getElementById('downloadButton').addEventListener('click', downloadOutputFile, false);
 
         let outputContent = '';
-        let originalFilename = '';
+        let originalFilename = 'recalculated_file.txt'; // Default filename
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
+            if (!file) return;
+
             originalFilename = file.name;
             const reader = new FileReader();
 
             reader.onload = function(e) {
                 const contents = e.target.result;
                 document.getElementById('inputFileContent').value = contents;
-                calculateAndDisplayOutput(contents);
             };
 
             reader.readAsText(file);
         }
 
-        function calculateAndDisplayOutput(contents) {
+        function runCalculation() {
+            const contents = document.getElementById('inputFileContent').value;
+            if (!contents) {
+                alert("Input box is empty.");
+                return;
+            }
+
             const lines = contents.split('\r\n');
             const firstLine = lines[0];
 
             if (firstLine.length >= 7 && firstLine.toUpperCase().startsWith('CRC')) {
+                // The data to be hashed starts after the 'CRCxxxx' prefix
                 const dataToHash = contents.substring(7);
 
                 const crc = crc16_ccitt_false(dataToHash);
@@ -69,7 +82,7 @@
                 document.getElementById('outputFileContent').value = outputContent;
                 document.getElementById('downloadButton').style.display = 'block';
             } else {
-                alert('The first line of the file must start with "CRCxxxx".');
+                alert('The first line of the input text must start with "CRCxxxx" (e.g., CRC0000).');
             }
         }
 
@@ -84,7 +97,7 @@
         }
 
         function crc16_ccitt_false(str) {
-            let crc = 0xFFFF;
+            let crc = 0xFFFF; // Initial value
             const polynomial = 0x1021;
 
             for (let i = 0; i < str.length; i++) {
